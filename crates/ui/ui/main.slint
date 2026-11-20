@@ -1,0 +1,1338 @@
+// Frayed UI — dark schedule shell with Base 02 display type.
+global Tokens {
+    out property <color> bg: #0B0F14;
+    out property <color> card: #181E29;
+    out property <color> elevated: #1E2532;
+    out property <color> text: #F8FAFC;
+    out property <color> secondary: #8B929C;
+    out property <color> accent: #22C55E;
+    out property <color> accent-2: #38BDF8;
+    out property <color> border: #283040;
+    out property <color> warm: #FBBF24;
+}
+
+export struct BlockView {
+    time: string,
+    title: string,
+    subtitle: string,
+    accent: color,
+    tint: color,
+}
+
+component PillButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> active: false;
+    in property <bool> enabled: true;
+    callback pressed();
+
+    background: root.active ? Tokens.accent : Tokens.elevated;
+    border-width: 1px;
+    border-color: root.active ? Tokens.accent : Tokens.border;
+    border-radius: 10px;
+    opacity: root.enabled ? 1 : 0.55;
+
+    Text {
+        width: 100%;
+        height: 100%;
+        text: root.label;
+        font-size: 12px;
+        color: root.active ? Tokens.bg : Tokens.text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        enabled: root.enabled;
+        clicked => { root.pressed(); }
+    }
+}
+
+export component MainWindow inherits Window {
+    preferred-width: 430px;
+    preferred-height: 860px;
+    width: 430px;
+    height: 860px;
+    background: Tokens.bg;
+
+    in property <string> status-time: "9:41";
+    in property <string> month-title: "April 2026";
+    in property <[string]> weekday-letters;
+    in property <[string]> weekday-numbers;
+    in property <int> selected-day: 0;
+    in property <[BlockView]> blocks;
+    in property <string> alert-title;
+    in property <string> alert-subtitle;
+    in property <string> streak-title;
+    in property <string> streak-subtitle;
+    in property <string> weather-text;
+    in property <string> transit-text;
+    in property <string> update-text;
+    in property <string> screen: "schedule";
+    in property <bool> busy: false;
+    in property <string> edit-title;
+    in property <string> edit-room;
+    in property <string> edit-start;
+    in property <string> edit-end;
+    in property <int> edit-kind;
+
+    callback day-selected(int);
+    callback nav-pressed(string);
+    callback today-pressed();
+    callback block-selected(int);
+    callback refresh-pressed();
+    callback cancel-day-pressed();
+    callback preset-pressed(int);
+    callback update-pressed();
+    callback edit-save(string, string, string, string, int);
+    callback edit-close();
+
+    // ponytail: edit-* are in properties, so the editable copies live here and are re-seeded on entry.
+    property <string> form-title: root.edit-title;
+    property <string> form-room: root.edit-room;
+    property <string> form-start: root.edit-start;
+    property <string> form-end: root.edit-end;
+    property <int> form-kind: root.edit-kind;
+
+    changed screen => {
+        if (root.screen == "edit") {
+            root.form-title = root.edit-title;
+            root.form-room = root.edit-room;
+            root.form-start = root.edit-start;
+            root.form-end = root.edit-end;
+            root.form-kind = root.edit-kind;
+        }
+    }
+    changed edit-title => { root.form-title = root.edit-title; }
+    changed edit-room => { root.form-room = root.edit-room; }
+    changed edit-start => { root.form-start = root.edit-start; }
+    changed edit-end => { root.form-end = root.edit-end; }
+    changed edit-kind => { root.form-kind = root.edit-kind; }
+
+    // status bar
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: 430px;
+        height: 36px;
+
+        Text {
+            x: 24px;
+            y: 9px;
+            text: root.status-time;
+            font-size: 13px;
+            font-weight: 600;
+            color: Tokens.text;
+        }
+
+        Text {
+            x: 292px;
+            y: 9px;
+            text: "▮▮▮ ⌁ ▰";
+            font-size: 12px;
+            color: Tokens.secondary;
+        }
+
+        if (root.busy): Text {
+            x: 232px;
+            y: 10px;
+            text: "working…";
+            font-size: 11px;
+            color: Tokens.accent;
+        }
+    }
+
+    // ---------------------------------------------------------------- schedule
+    if (root.screen == "schedule"): Rectangle {
+        x: 0;
+        y: 36px;
+        width: 430px;
+        height: 756px;
+
+        Text {
+            x: 24px;
+            y: 14px;
+            text: root.month-title;
+            font-size: 23px;
+            font-weight: 700;
+            color: Tokens.text;
+            font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+        }
+
+        TouchArea {
+            x: 338px;
+            y: 12px;
+            width: 68px;
+            height: 34px;
+            clicked => { root.today-pressed(); }
+
+            Rectangle {
+                width: 100%;
+                height: 100%;
+                border-radius: 17px;
+                border-width: 1px;
+                border-color: Tokens.accent;
+                background: rgba(34, 197, 94, 0.08);
+            }
+
+            Text {
+                width: 100%;
+                height: 100%;
+                text: "Today";
+                font-size: 12px;
+                color: Tokens.accent;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        // week strip — driven entirely by the model arrays
+        for day[i] in root.weekday-letters: TouchArea {
+            x: 24px + i * 56px;
+            y: 62px;
+            width: 46px;
+            height: 88px;
+            clicked => { root.day-selected(i); }
+
+            Rectangle {
+                x: 1px;
+                y: 8px;
+                width: 44px;
+                height: 54px;
+                border-radius: 14px;
+                background: i == root.selected-day ? Tokens.accent : rgba(34, 197, 94, 0);
+            }
+
+            Text {
+                x: 0;
+                y: 15px;
+                width: 100%;
+                text: day;
+                font-size: 11px;
+                font-weight: 700;
+                color: i == root.selected-day ? Tokens.bg : Tokens.secondary;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                x: 0;
+                y: 35px;
+                width: 100%;
+                text: root.weekday-numbers[i];
+                font-size: 18px;
+                font-weight: 600;
+                color: i == root.selected-day ? Tokens.bg : Tokens.text;
+                horizontal-alignment: center;
+            }
+        }
+
+        Flickable {
+            x: 0;
+            y: 158px;
+            width: 430px;
+            height: 634px;
+            content-width: 430px;
+            content-height: root.blocks.length * 76px + 40px;
+
+            if (root.blocks.length == 0): Text {
+                x: 24px;
+                y: 60px;
+                width: 382px;
+                text: "No classes planned for this day.";
+                font-size: 13px;
+                color: Tokens.secondary;
+            }
+
+            for block[i] in root.blocks: Rectangle {
+                x: 0;
+                y: i * 76px;
+                width: 430px;
+                height: 76px;
+
+                Text {
+                    x: 24px;
+                    y: 26px;
+                    width: 54px;
+                    text: block.time;
+                    font-size: 12px;
+                    color: Tokens.secondary;
+                }
+
+                Rectangle {
+                    x: 86px;
+                    y: 8px;
+                    width: 320px;
+                    height: 60px;
+                    border-radius: 12px;
+                    background: Tokens.card;
+                    border-width: 1px;
+                    border-color: Tokens.border;
+                }
+
+                Rectangle {
+                    x: 86px;
+                    y: 8px;
+                    width: 320px;
+                    height: 60px;
+                    border-radius: 12px;
+                    background: block.tint;
+                }
+
+                Rectangle {
+                    x: 92px;
+                    y: 20px;
+                    width: 4px;
+                    height: 36px;
+                    border-radius: 2px;
+                    background: block.accent;
+                }
+
+                Text {
+                    x: 106px;
+                    y: 15px;
+                    width: 286px;
+                    text: block.title;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: Tokens.text;
+                    font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+
+                Text {
+                    x: 106px;
+                    y: 38px;
+                    width: 286px;
+                    text: block.subtitle;
+                    font-size: 12px;
+                    color: Tokens.secondary;
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+
+                TouchArea {
+                    x: 86px;
+                    y: 8px;
+                    width: 320px;
+                    height: 60px;
+                    clicked => { root.block-selected(i); }
+                }
+            }
+        }
+
+        // floating callouts
+        Rectangle {
+            x: 20px;
+            y: 598px;
+            width: 212px;
+            height: 70px;
+            border-radius: 14px;
+            background: Tokens.elevated;
+            border-width: 1px;
+            border-color: Tokens.border;
+            drop-shadow-blur: 12px;
+            drop-shadow-color: rgba(0, 0, 0, 0.45);
+            drop-shadow-offset-y: 6px;
+
+            Rectangle {
+                x: 12px;
+                y: 19px;
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                background: Tokens.accent;
+            }
+
+            Text {
+                x: 12px;
+                y: 19px;
+                width: 32px;
+                height: 32px;
+                text: "!";
+                font-size: 16px;
+                font-weight: 700;
+                color: Tokens.bg;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 54px;
+                y: 12px;
+                width: 148px;
+                text: root.alert-title;
+                font-size: 13px;
+                font-weight: 700;
+                color: Tokens.text;
+                font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+                overflow: TextOverflow.elide;
+                wrap: TextWrap.no-wrap;
+            }
+
+            Text {
+                x: 54px;
+                y: 34px;
+                width: 148px;
+                text: root.alert-subtitle;
+                font-size: 11px;
+                color: Tokens.secondary;
+                overflow: TextOverflow.elide;
+                wrap: TextWrap.no-wrap;
+            }
+        }
+
+        Rectangle {
+            x: 238px;
+            y: 682px;
+            width: 172px;
+            height: 74px;
+            border-radius: 14px;
+            background: Tokens.elevated;
+            border-width: 1px;
+            border-color: Tokens.border;
+            drop-shadow-blur: 12px;
+            drop-shadow-color: rgba(0, 0, 0, 0.45);
+            drop-shadow-offset-y: 6px;
+
+            Rectangle {
+                x: 12px;
+                y: 20px;
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                background: Tokens.warm;
+            }
+
+            Text {
+                x: 12px;
+                y: 20px;
+                width: 32px;
+                height: 32px;
+                text: "★";
+                font-size: 15px;
+                color: Tokens.bg;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 52px;
+                y: 13px;
+                width: 110px;
+                text: root.streak-title;
+                font-size: 13px;
+                font-weight: 700;
+                color: Tokens.text;
+                font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+                overflow: TextOverflow.elide;
+                wrap: TextWrap.no-wrap;
+            }
+
+            Text {
+                x: 52px;
+                y: 36px;
+                width: 110px;
+                text: root.streak-subtitle;
+                font-size: 11px;
+                color: Tokens.secondary;
+                overflow: TextOverflow.elide;
+                wrap: TextWrap.no-wrap;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ secondary
+    if (root.screen != "schedule"): Rectangle {
+        x: 0;
+        y: 36px;
+        width: 430px;
+        height: 756px;
+
+        Text {
+            x: 24px;
+            y: 18px;
+            text: root.screen == "home" ? "Home" :
+                  root.screen == "menu" ? "Menu" :
+                  root.screen == "ai" ? "AI Assistant" : "Редактирование";
+            font-size: 24px;
+            font-weight: 700;
+            color: Tokens.text;
+            font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+        }
+
+        if (root.screen != "edit"): Text {
+            x: 24px;
+            y: 52px;
+            text: "FRAYED · PERSONAL SCHEDULE";
+            font-size: 10px;
+            color: Tokens.secondary;
+            letter-spacing: 1px;
+        }
+
+        // home
+        if (root.screen == "home"): Rectangle {
+            x: 0;
+            y: 84px;
+            width: 430px;
+            height: 660px;
+
+            Rectangle {
+                x: 20px;
+                y: 0;
+                width: 390px;
+                height: 116px;
+                border-radius: 14px;
+                background: Tokens.card;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Rectangle {
+                    x: 0;
+                    y: 14px;
+                    width: 4px;
+                    height: 88px;
+                    border-radius: 2px;
+                    background: Tokens.accent;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 14px;
+                    text: "TODAY";
+                    font-size: 10px;
+                    color: Tokens.accent;
+                    letter-spacing: 1px;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 36px;
+                    width: 350px;
+                    text: root.alert-title;
+                    font-size: 17px;
+                    font-weight: 700;
+                    color: Tokens.text;
+                    font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 68px;
+                    width: 350px;
+                    text: root.alert-subtitle;
+                    font-size: 13px;
+                    color: Tokens.secondary;
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+            }
+
+            Rectangle {
+                x: 20px;
+                y: 132px;
+                width: 390px;
+                height: 100px;
+                border-radius: 14px;
+                background: Tokens.card;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Rectangle {
+                    x: 18px;
+                    y: 22px;
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 17px;
+                    background: Tokens.warm;
+                }
+
+                Text {
+                    x: 18px;
+                    y: 22px;
+                    width: 34px;
+                    height: 34px;
+                    text: "★";
+                    font-size: 16px;
+                    color: Tokens.bg;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    x: 66px;
+                    y: 18px;
+                    width: 306px;
+                    text: root.streak-title;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: Tokens.text;
+                    font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+
+                Text {
+                    x: 66px;
+                    y: 46px;
+                    width: 306px;
+                    text: root.streak-subtitle;
+                    font-size: 12px;
+                    color: Tokens.secondary;
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+            }
+
+            Rectangle {
+                x: 20px;
+                y: 248px;
+                width: 390px;
+                height: 92px;
+                border-radius: 14px;
+                background: Tokens.elevated;
+
+                Text {
+                    x: 20px;
+                    y: 16px;
+                    text: "Quick tip";
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: Tokens.text;
+                    font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+                }
+
+                Text {
+                    x: 20px;
+                    y: 44px;
+                    width: 350px;
+                    text: "Tap a block in Schedule to change it.";
+                    font-size: 12px;
+                    color: Tokens.secondary;
+                }
+            }
+
+            if (root.blocks.length > 0): Rectangle {
+                x: 20px;
+                y: 356px;
+                width: 390px;
+                height: 76px;
+                border-radius: 14px;
+                background: Tokens.card;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Rectangle {
+                    x: 0;
+                    y: 12px;
+                    width: 4px;
+                    height: 52px;
+                    border-radius: 2px;
+                    background: Tokens.accent-2;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 12px;
+                    text: "UP NEXT";
+                    font-size: 10px;
+                    color: Tokens.accent-2;
+                    letter-spacing: 1px;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 34px;
+                    width: 350px;
+                    text: root.blocks[0].title;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: Tokens.text;
+                    font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+            }
+        }
+
+        // menu
+        if (root.screen == "menu"): Rectangle {
+            x: 0;
+            y: 84px;
+            width: 430px;
+            height: 660px;
+
+            Rectangle {
+                x: 20px;
+                y: 0;
+                width: 390px;
+                height: 68px;
+                border-radius: 12px;
+                background: Tokens.card;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Text {
+                    x: 18px;
+                    y: 10px;
+                    text: "WEATHER";
+                    font-size: 10px;
+                    color: Tokens.secondary;
+                    letter-spacing: 1px;
+                }
+
+                Text {
+                    x: 18px;
+                    y: 32px;
+                    width: 354px;
+                    text: root.weather-text;
+                    font-size: 14px;
+                    color: Tokens.text;
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+            }
+
+            Rectangle {
+                x: 20px;
+                y: 76px;
+                width: 390px;
+                height: 68px;
+                border-radius: 12px;
+                background: Tokens.card;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Text {
+                    x: 18px;
+                    y: 10px;
+                    text: "TRANSIT";
+                    font-size: 10px;
+                    color: Tokens.secondary;
+                    letter-spacing: 1px;
+                }
+
+                Text {
+                    x: 18px;
+                    y: 32px;
+                    width: 354px;
+                    text: root.transit-text;
+                    font-size: 14px;
+                    color: Tokens.text;
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+            }
+
+            Rectangle {
+                x: 20px;
+                y: 152px;
+                width: 390px;
+                height: 68px;
+                border-radius: 12px;
+                background: Tokens.card;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Text {
+                    x: 18px;
+                    y: 10px;
+                    text: "UPDATE";
+                    font-size: 10px;
+                    color: Tokens.secondary;
+                    letter-spacing: 1px;
+                }
+
+                Text {
+                    x: 18px;
+                    y: 32px;
+                    width: 354px;
+                    text: root.update-text;
+                    font-size: 14px;
+                    color: Tokens.text;
+                    overflow: TextOverflow.elide;
+                    wrap: TextWrap.no-wrap;
+                }
+            }
+
+            PillButton {
+                x: 20px;
+                y: 236px;
+                width: 118px;
+                height: 40px;
+                label: "Refresh";
+                active: true;
+                enabled: !root.busy;
+                pressed => { root.refresh-pressed(); }
+            }
+
+            PillButton {
+                x: 156px;
+                y: 236px;
+                width: 118px;
+                height: 40px;
+                label: "Cancel day";
+                pressed => { root.cancel-day-pressed(); }
+            }
+
+            PillButton {
+                x: 292px;
+                y: 236px;
+                width: 118px;
+                height: 40px;
+                label: "Check now";
+                enabled: !root.busy;
+                pressed => { root.update-pressed(); }
+            }
+
+            Text {
+                x: 24px;
+                y: 296px;
+                text: "GROUP PRESETS";
+                font-size: 10px;
+                color: Tokens.secondary;
+                letter-spacing: 1px;
+            }
+
+            PillButton {
+                x: 20px;
+                y: 322px;
+                width: 118px;
+                height: 42px;
+                label: "Preset 1";
+                pressed => { root.preset-pressed(0); }
+            }
+
+            PillButton {
+                x: 156px;
+                y: 322px;
+                width: 118px;
+                height: 42px;
+                label: "Preset 2";
+                pressed => { root.preset-pressed(1); }
+            }
+
+            PillButton {
+                x: 292px;
+                y: 322px;
+                width: 118px;
+                height: 42px;
+                label: "Preset 3";
+                pressed => { root.preset-pressed(2); }
+            }
+
+            PillButton {
+                x: 20px;
+                y: 386px;
+                width: 390px;
+                height: 44px;
+                label: "Check for updates";
+                enabled: !root.busy;
+                pressed => { root.update-pressed(); }
+            }
+        }
+
+        // ai
+        if (root.screen == "ai"): Rectangle {
+            x: 0;
+            y: 84px;
+            width: 430px;
+            height: 660px;
+
+            Rectangle {
+                x: 20px;
+                y: 0;
+                width: 390px;
+                height: 120px;
+                border-radius: 14px;
+                background: Tokens.card;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Rectangle {
+                    x: 0;
+                    y: 14px;
+                    width: 4px;
+                    height: 92px;
+                    border-radius: 2px;
+                    background: Tokens.accent-2;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 18px;
+                    text: "Ask about your day";
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: Tokens.text;
+                    font-family: "Base 02"; // ponytail: Slint 1.19 takes one family; Latn/Cyrl fallbacks registered in lib.rs
+                }
+
+                Text {
+                    x: 20px;
+                    y: 50px;
+                    width: 350px;
+                    text: "Plan around classes, weather, and transit.";
+                    font-size: 12px;
+                    color: Tokens.secondary;
+                }
+            }
+
+            Rectangle {
+                x: 20px;
+                y: 136px;
+                width: 390px;
+                height: 52px;
+                border-radius: 12px;
+                background: Tokens.elevated;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Text {
+                    x: 18px;
+                    y: 15px;
+                    text: "Type a question…";
+                    font-size: 13px;
+                    color: Tokens.secondary;
+                }
+
+                Rectangle {
+                    x: 346px;
+                    y: 8px;
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 18px;
+                    background: Tokens.accent;
+                }
+
+                Text {
+                    x: 346px;
+                    y: 8px;
+                    width: 36px;
+                    height: 36px;
+                    text: "→";
+                    font-size: 17px;
+                    color: Tokens.bg;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                x: 20px;
+                y: 210px;
+                width: 118px;
+                height: 36px;
+                border-radius: 12px;
+                background: Tokens.elevated;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Text {
+                    width: 100%;
+                    height: 100%;
+                    text: "What's next?";
+                    font-size: 11px;
+                    color: Tokens.secondary;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                x: 156px;
+                y: 210px;
+                width: 118px;
+                height: 36px;
+                border-radius: 12px;
+                background: Tokens.elevated;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Text {
+                    width: 100%;
+                    height: 100%;
+                    text: "Leave now?";
+                    font-size: 11px;
+                    color: Tokens.secondary;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                x: 292px;
+                y: 210px;
+                width: 118px;
+                height: 36px;
+                border-radius: 12px;
+                background: Tokens.elevated;
+                border-width: 1px;
+                border-color: Tokens.border;
+
+                Text {
+                    width: 100%;
+                    height: 100%;
+                    text: "Free time";
+                    font-size: 11px;
+                    color: Tokens.secondary;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // edit
+        if (root.screen == "edit"): Rectangle {
+            x: 0;
+            y: 84px;
+            width: 430px;
+            height: 660px;
+
+            Text {
+                x: 24px;
+                y: 0;
+                text: "Предмет";
+                font-size: 11px;
+                color: Tokens.secondary;
+            }
+            Rectangle {
+                x: 20px;
+                y: 18px;
+                width: 390px;
+                height: 46px;
+                border-radius: 11px;
+                background: Tokens.elevated;
+                border-width: 1px;
+                border-color: Tokens.border;
+            }
+            title-input := TextInput {
+                x: 36px;
+                y: 18px;
+                width: 358px;
+                height: 46px;
+                text <=> root.form-title;
+                font-size: 14px;
+                color: Tokens.text;
+                selection-background-color: Tokens.accent;
+                selection-foreground-color: Tokens.bg;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 24px;
+                y: 82px;
+                text: "Аудитория";
+                font-size: 11px;
+                color: Tokens.secondary;
+            }
+            Rectangle {
+                x: 20px;
+                y: 100px;
+                width: 390px;
+                height: 46px;
+                border-radius: 11px;
+                background: Tokens.elevated;
+                border-width: 1px;
+                border-color: Tokens.border;
+            }
+            room-input := TextInput {
+                x: 36px;
+                y: 100px;
+                width: 358px;
+                height: 46px;
+                text <=> root.form-room;
+                font-size: 14px;
+                color: Tokens.text;
+                selection-background-color: Tokens.accent;
+                selection-foreground-color: Tokens.bg;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 24px;
+                y: 164px;
+                text: "Начало";
+                font-size: 11px;
+                color: Tokens.secondary;
+            }
+            Rectangle {
+                x: 20px;
+                y: 182px;
+                width: 390px;
+                height: 46px;
+                border-radius: 11px;
+                background: Tokens.elevated;
+                border-width: 1px;
+                border-color: Tokens.border;
+            }
+            start-input := TextInput {
+                x: 36px;
+                y: 182px;
+                width: 358px;
+                height: 46px;
+                text <=> root.form-start;
+                input-type: InputType.text;
+                font-size: 14px;
+                color: Tokens.text;
+                selection-background-color: Tokens.accent;
+                selection-foreground-color: Tokens.bg;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 24px;
+                y: 246px;
+                text: "Конец";
+                font-size: 11px;
+                color: Tokens.secondary;
+            }
+            Rectangle {
+                x: 20px;
+                y: 264px;
+                width: 390px;
+                height: 46px;
+                border-radius: 11px;
+                background: Tokens.elevated;
+                border-width: 1px;
+                border-color: Tokens.border;
+            }
+            end-input := TextInput {
+                x: 36px;
+                y: 264px;
+                width: 358px;
+                height: 46px;
+                text <=> root.form-end;
+                input-type: InputType.text;
+                font-size: 14px;
+                color: Tokens.text;
+                selection-background-color: Tokens.accent;
+                selection-foreground-color: Tokens.bg;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 24px;
+                y: 322px;
+                text: "Формат HH:MM";
+                font-size: 11px;
+                color: Tokens.accent-2;
+            }
+
+            Text {
+                x: 24px;
+                y: 356px;
+                text: "Тип занятия";
+                font-size: 11px;
+                color: Tokens.secondary;
+            }
+
+            PillButton {
+                x: 20px; y: 382px; width: 60px; height: 38px;
+                label: "Лекция"; active: root.form-kind == 0;
+                pressed => { root.form-kind = 0; }
+            }
+            PillButton {
+                x: 86px; y: 382px; width: 60px; height: 38px;
+                label: "Лаба"; active: root.form-kind == 1;
+                pressed => { root.form-kind = 1; }
+            }
+            PillButton {
+                x: 152px; y: 382px; width: 60px; height: 38px;
+                label: "Тест"; active: root.form-kind == 2;
+                pressed => { root.form-kind = 2; }
+            }
+            PillButton {
+                x: 218px; y: 382px; width: 60px; height: 38px;
+                label: "Практика"; active: root.form-kind == 3;
+                pressed => { root.form-kind = 3; }
+            }
+            PillButton {
+                x: 284px; y: 382px; width: 60px; height: 38px;
+                label: "Перерыв"; active: root.form-kind == 4;
+                pressed => { root.form-kind = 4; }
+            }
+            PillButton {
+                x: 350px; y: 382px; width: 60px; height: 38px;
+                label: "Другое"; active: root.form-kind == 5;
+                pressed => { root.form-kind = 5; }
+            }
+
+            PillButton {
+                x: 20px;
+                y: 500px;
+                width: 240px;
+                height: 48px;
+                label: "Сохранить";
+                active: true;
+                pressed => {
+                    root.edit-save(root.form-title, root.form-room, root.form-start, root.form-end, root.form-kind);
+                }
+            }
+            PillButton {
+                x: 272px;
+                y: 500px;
+                width: 138px;
+                height: 48px;
+                label: "Отмена";
+                pressed => { root.edit-close(); }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ bottom nav
+    Rectangle {
+        x: 0;
+        y: 792px;
+        width: 430px;
+        height: 68px;
+        background: Tokens.bg;
+
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: 1px;
+            background: Tokens.border;
+        }
+
+        TouchArea {
+            x: 0;
+            y: 1px;
+            width: 86px;
+            height: 67px;
+            clicked => { root.nav-pressed("home"); }
+
+            if (root.screen == "home"): Rectangle {
+                x: 33px;
+                y: 12px;
+                width: 20px;
+                height: 3px;
+                border-radius: 2px;
+                background: Tokens.accent;
+            }
+
+            Text {
+                x: 0;
+                y: 36px;
+                width: 100%;
+                text: "Home";
+                font-size: 11px;
+                color: root.screen == "home" ? Tokens.accent : Tokens.secondary;
+                horizontal-alignment: center;
+            }
+        }
+
+        TouchArea {
+            x: 86px;
+            y: 1px;
+            width: 86px;
+            height: 67px;
+            clicked => { root.nav-pressed("schedule"); }
+
+            if (root.screen == "schedule" || root.screen == "edit"): Rectangle {
+                x: 33px;
+                y: 12px;
+                width: 20px;
+                height: 3px;
+                border-radius: 2px;
+                background: Tokens.accent;
+            }
+
+            Text {
+                x: 0;
+                y: 36px;
+                width: 100%;
+                text: "Schedule";
+                font-size: 11px;
+                color: root.screen == "schedule" || root.screen == "edit" ? Tokens.accent : Tokens.secondary;
+                horizontal-alignment: center;
+            }
+        }
+
+        TouchArea {
+            x: 181px;
+            y: 8px;
+            width: 52px;
+            height: 52px;
+            clicked => { root.nav-pressed("add"); }
+
+            Rectangle {
+                width: 100%;
+                height: 100%;
+                border-radius: 26px;
+                background: Tokens.accent;
+                drop-shadow-blur: 12px;
+                drop-shadow-color: rgba(34, 197, 94, 0.3);
+                drop-shadow-offset-y: 3px;
+            }
+
+            Text {
+                width: 100%;
+                height: 100%;
+                text: "+";
+                font-size: 30px;
+                color: Tokens.bg;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        TouchArea {
+            x: 258px;
+            y: 1px;
+            width: 86px;
+            height: 67px;
+            clicked => { root.nav-pressed("menu"); }
+
+            if (root.screen == "menu"): Rectangle {
+                x: 33px;
+                y: 12px;
+                width: 20px;
+                height: 3px;
+                border-radius: 2px;
+                background: Tokens.accent;
+            }
+
+            Text {
+                x: 0;
+                y: 36px;
+                width: 100%;
+                text: "Menu";
+                font-size: 11px;
+                color: root.screen == "menu" ? Tokens.accent : Tokens.secondary;
+                horizontal-alignment: center;
+            }
+        }
+
+        TouchArea {
+            x: 344px;
+            y: 1px;
+            width: 86px;
+            height: 67px;
+            clicked => { root.nav-pressed("ai"); }
+
+            if (root.screen == "ai"): Rectangle {
+                x: 33px;
+                y: 12px;
+                width: 20px;
+                height: 3px;
+                border-radius: 2px;
+                background: Tokens.accent;
+            }
+
+            Text {
+                x: 0;
+                y: 36px;
+                width: 100%;
+                text: "AI";
+                font-size: 11px;
+                color: root.screen == "ai" ? Tokens.accent : Tokens.secondary;
+                horizontal-alignment: center;
+            }
+        }
+    }
+}

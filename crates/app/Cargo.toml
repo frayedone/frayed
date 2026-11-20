@@ -1,0 +1,62 @@
+[package]
+name = "frayed-app"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "frayed_app"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+frayed-core = { path = "../core" }
+frayed-net = { path = "../net" }
+frayed-ui = { path = "../ui" }
+slint = { version = "1.19", features = ["unstable-fontique-012"] }
+tokio = { version = "1", features = ["rt", "time"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+slint = { version = "1.19", features = ["backend-android-activity-06", "unstable-fontique-012"] }
+jni = "0.22"
+android-activity = "0.5"
+
+[package.metadata.android]
+package = "com.frayed.app"
+version_code = 1
+version_name = "0.1.0"
+apk_name = "frayed"
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.INTERNET"
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.REQUEST_INSTALL_PACKAGES"
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.POST_NOTIFICATIONS"
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.RECEIVE_BOOT_COMPLETED"
+
+[package.metadata.android.sdk]
+min_sdk_version = 24
+target_sdk_version = 35
+
+[package.metadata.android.application]
+label = "frayed"
+
+[[package.metadata.android.application.activity]]
+name = "android.app.NativeActivity"
+exported = true
+
+[[package.metadata.android.application.activity.meta_data]]
+name = "android.app.lib_name"
+value = "frayed_app"
+
+[[package.metadata.android.application.activity.intent_filter]]
+actions = ["android.intent.action.VIEW", "android.intent.action.MAIN"]
+categories = ["android.intent.category.LAUNCHER"]
+
+# So ACTION_VIEW/INSTALL_PACKAGE can resolve the package installer on API 30+.
+[[package.metadata.android.queries.intent]]
+actions = ["android.intent.action.VIEW", "android.intent.action.INSTALL_PACKAGE"]

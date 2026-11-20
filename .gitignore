@@ -1,0 +1,5 @@
+/target
+**/target
+*.apk
+*.keystore
+.frayed/

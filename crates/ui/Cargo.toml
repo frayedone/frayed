@@ -1,0 +1,15 @@
+[package]
+name = "frayed-ui"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "frayed_ui"
+path = "src/lib.rs"
+
+[dependencies]
+slint = { version = "1.19", features = ["unstable-fontique-012"] }
+fontique = "0.12"
+
+[build-dependencies]
+slint-build = "1.19"

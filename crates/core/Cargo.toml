@@ -1,0 +1,13 @@
+[package]
+name = "frayed-core"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "frayed_core"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["clock"] }
