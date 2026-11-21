@@ -5,7 +5,7 @@ edition.workspace = true
 
 [lib]
 name = "frayed_app"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]

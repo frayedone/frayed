@@ -1,0 +1,1 @@
+fn main() { frayed_app::run().unwrap(); }
