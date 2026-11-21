@@ -5,7 +5,11 @@ use serde::{Deserialize, Serialize};
 pub mod date;
 pub mod storage;
 
-pub use date::{month_length, month_title_ru, next_class_start, now_local, week_dates, LocalTime};
+pub use date::{
+    context_line, date_label, genitive_month_ru, lesson_progress, lesson_state, month_length,
+    month_title_ru, next_class_start, now_local, spaced, week_dates, LocalTime, WEEKDAY_FULL,
+    WEEKDAY_SHORT,
+};
 pub use storage::{data_path, load, save, AppData, Settings};
 
 pub const WEEKDAYS: usize = 7;
@@ -41,6 +45,9 @@ impl BlockKind {
 pub struct ClassBlock {
     pub title: String,
     pub room: String,
+    /// Defaults to "" so JSON saved before this field existed still loads.
+    #[serde(default)]
+    pub teacher: String,
     pub start_min: u32,
     pub end_min: u32,
     pub kind: BlockKind,
@@ -90,6 +97,55 @@ pub struct GroupPreset {
     pub id: String,
     pub name: String,
     pub schedule: Schedule,
+}
+
+/// Built-in group П4Г, mirrored from Freya's `assets/schedule.json`.
+pub fn default_group_preset() -> GroupPreset {
+    let b = |title: &str, room: &str, teacher: &str, start: &str, end: &str| ClassBlock {
+        title: title.into(),
+        room: room.into(),
+        teacher: teacher.into(),
+        start_min: time_to_minutes(start).expect("literal start time"),
+        end_min: time_to_minutes(end).expect("literal end time"),
+        kind: BlockKind::Lecture,
+    };
+
+    let mut schedule = Schedule::new();
+    // Dart weekday 1 = Monday = our index 0.
+    schedule.day_mut(0).blocks = vec![
+        b("Охрана труда", "315 ауд.", "Бородихин В.А.", "11:00", "12:20"),
+        b("Базы данных", "304 ауд.", "Тойшибаева А.М.", "12:50", "14:10"),
+        b("Физическая культура", "Спортзал", "Кушенов Ф.Т.", "14:20", "15:40"),
+        b("Защита безопасности информации", "410 ауд.", "Усенбаев Н.Б.", "15:50", "17:10"),
+    ];
+    schedule.day_mut(1).blocks = vec![
+        b("Базы данных", "304 ауд.", "Тойшибаева А.М.", "11:00", "12:20"),
+        b("Рефакторинг программного кода", "406 ауд.", "Абайұлы Т.", "12:50", "14:10"),
+        b("Экономика", "105 ауд.", "Кияш Ш.М.", "14:20", "15:40"),
+    ];
+    schedule.day_mut(2).blocks = vec![
+        b("Компьютерные сети", "402 ауд.", "", "12:50", "14:10"),
+        b("Физическая культура", "Спортзал", "Кушенов Ф.Т.", "14:20", "15:40"),
+        b("Мобильные приложения", "303 ауд.", "Медетбекова М.Д.", "15:50", "17:10"),
+        b("Базы данных", "304 ауд.", "Тойшибаева А.М.", "17:20", "18:40"),
+    ];
+    schedule.day_mut(3).blocks = vec![
+        b("Мобильные приложения", "303 ауд.", "Медетбекова М.Д.", "11:00", "12:20"),
+        b("Охрана труда", "315 ауд.", "Бородихин В.А.", "12:50", "14:10"),
+        b("Компьютерные сети", "402 ауд.", "", "14:20", "15:40"),
+        b("Защита безопасности информации", "410 ауд.", "Усенбаев Н.Б.", "15:50", "17:10"),
+    ];
+    schedule.day_mut(4).blocks = vec![
+        b("Рефакторинг программного кода", "406 ауд.", "Абайұлы Т.", "12:50", "14:10"),
+        b("Базы данных", "304 ауд.", "Тойшибаева А.М.", "14:20", "15:40"),
+        b("Мобильные приложения", "303 ауд.", "Медетбекова М.Д.", "15:50", "17:10"),
+    ];
+
+    GroupPreset {
+        id: "П4Г".into(),
+        name: "П4Г".into(),
+        schedule,
+    }
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -227,6 +283,38 @@ pub fn weather_flags_from_code(code: i32) -> (bool, bool) {
     let rain = (51..=67).contains(&code) || (80..=82).contains(&code);
     let snow = (71..=77).contains(&code) || (85..=86).contains(&code);
     (rain, snow)
+}
+
+/// Russian WMO label, copied from Freya's `lib/utils/wmo.dart`.
+pub fn weather_label_ru(code: i32) -> &'static str {
+    match code {
+        0 => "Ясно",
+        1 => "Преимущественно ясно",
+        2 => "Переменная облачность",
+        3 => "Пасмурно",
+        45 | 48 => "Туман",
+        51..=57 => "Морось",
+        61..=67 => "Дождь",
+        71..=77 => "Снег",
+        80..=82 => "Ливень",
+        85..=86 => "Снегопад",
+        95..=99 => "Гроза",
+        _ => "Неизвестно",
+    }
+}
+
+/// Three 0xRRGGBB backdrop stops from Freya's `screens/weather_screen.dart`.
+pub fn weather_gradient(code: i32) -> (u32, u32, u32) {
+    match code {
+        0 => (0x102A56, 0x1E6FD9, 0x4FC3F7),
+        1 | 2 => (0x1B1F4B, 0x3949AB, 0x7C8CFF),
+        3 => (0x1C242B, 0x455A64, 0x263238),
+        45 | 48 => (0x263238, 0x546E7A, 0x37474F),
+        51..=67 => (0x062A44, 0x0277BD, 0x00ACC1),
+        71..=86 => (0x263238, 0x607D8B, 0xB0BEC5),
+        code if code >= 95 => (0x1A0836, 0x6A1B9A, 0xB71C1C),
+        _ => (0x101418, 0x263238, 0x37474F),
+    }
 }
 
 impl WeatherInfo {
@@ -368,6 +456,7 @@ mod tests {
         schedule.day_mut(2).blocks.push(ClassBlock {
             title: "Math".into(),
             room: "A-1".into(),
+            teacher: String::new(),
             start_min: 540,
             end_min: 630,
             kind: BlockKind::Lecture,
@@ -384,6 +473,7 @@ mod tests {
         schedule.day_mut(3).blocks.push(ClassBlock {
             title: "Physics".into(),
             room: "B-204".into(),
+            teacher: String::new(),
             start_min: 660,
             end_min: 780,
             kind: BlockKind::Lab,
@@ -395,6 +485,7 @@ mod tests {
             blocks: vec![ClassBlock {
                 title: "Physics".into(),
                 room: "B-204".into(),
+                teacher: String::new(),
                 start_min: 660,
                 end_min: 780,
                 kind: BlockKind::Lab,
@@ -416,5 +507,51 @@ mod tests {
         let hint = compute_departure_hint(&weather, Some(540), 300);
         assert!(hint.leave_now);
         assert!(!hint.reason.is_empty());
+    }
+
+    #[test]
+    fn weather_copy_and_gradient() {
+        assert_eq!(weather_label_ru(0), "Ясно");
+        assert_eq!(weather_label_ru(1), "Преимущественно ясно");
+        assert_eq!(weather_label_ru(2), "Переменная облачность");
+        assert_eq!(weather_label_ru(3), "Пасмурно");
+        assert_eq!(weather_label_ru(45), "Туман");
+        assert_eq!(weather_label_ru(57), "Морось");
+        assert_eq!(weather_label_ru(67), "Дождь");
+        assert_eq!(weather_label_ru(77), "Снег");
+        assert_eq!(weather_label_ru(82), "Ливень");
+        assert_eq!(weather_label_ru(86), "Снегопад");
+        assert_eq!(weather_label_ru(99), "Гроза");
+        assert_eq!(weather_label_ru(100), "Неизвестно");
+        assert_eq!(weather_gradient(0), (0x102A56, 0x1E6FD9, 0x4FC3F7));
+        assert_eq!(weather_gradient(2), (0x1B1F4B, 0x3949AB, 0x7C8CFF));
+        assert_eq!(weather_gradient(3), (0x1C242B, 0x455A64, 0x263238));
+        assert_eq!(weather_gradient(48), (0x263238, 0x546E7A, 0x37474F));
+        assert_eq!(weather_gradient(61), (0x062A44, 0x0277BD, 0x00ACC1));
+        assert_eq!(weather_gradient(86), (0x263238, 0x607D8B, 0xB0BEC5));
+        assert_eq!(weather_gradient(95), (0x1A0836, 0x6A1B9A, 0xB71C1C));
+        assert_eq!(weather_gradient(42), (0x101418, 0x263238, 0x37474F));
+    }
+
+    #[test]
+    fn default_preset_matches_freya_schedule() {
+        let preset = default_group_preset();
+        assert_eq!(preset.name, "П4Г");
+        assert_eq!(preset.schedule.day(0).blocks.len(), 4);
+        assert_eq!(preset.schedule.day(4).blocks.len(), 3);
+        assert_eq!(preset.schedule.day(0).blocks[0].title, "Охрана труда");
+        assert_eq!(preset.schedule.day(0).blocks[0].room, "315 ауд.");
+        assert_eq!(preset.schedule.day(0).blocks[0].start_min, 660);
+        assert_eq!(preset.schedule.day(0).blocks[0].end_min, 740);
+        assert_eq!(preset.schedule.day(0).blocks[0].teacher, "Бородихин В.А.");
+        assert_eq!(preset.schedule.day(2).blocks[0].teacher, "");
+        assert_eq!(preset.schedule.day(4).blocks[0].teacher, "Абайұлы Т.");
+    }
+
+    #[test]
+    fn old_block_json_without_teacher_still_loads() {
+        let json = r#"{"title":"Math","room":"A-1","start_min":540,"end_min":630,"kind":"Lecture"}"#;
+        let block: ClassBlock = serde_json::from_str(json).unwrap();
+        assert_eq!(block.teacher, "");
     }
 }

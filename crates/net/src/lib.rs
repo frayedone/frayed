@@ -212,6 +212,92 @@ pub fn fetch_departures(_from: &str, _to: &str) -> Vec<TransitArrival> {
     static_departures()
 }
 
+// ---------------------------------------------------------------------------
+// Static Almaty transport (Russian copy)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StopArrival {
+    pub route: String,
+    pub vehicle: String,
+    pub eta_min: u32,
+    pub badge: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteLeg {
+    pub vehicle: String,
+    pub route: String,
+    pub from: String,
+    pub to: String,
+    pub minutes: u32,
+}
+
+// ponytail: static schedule, replace when a real GTFS feed is available
+const RU_STOP_NAMES: &[&str] = &["ВУЗ", "КазНУ", "Абая", "Алмалы"];
+
+// (route, vehicle, badge, first departure in minutes past midnight, headway)
+const RU_ROUTES: &[(&str, &str, &str, u32, u32)] = &[
+    ("12", "Автобус", "Без пересадок", 6 * 60 + 10, 7),
+    ("120", "Автобус", "Без пересадок", 6 * 60 + 25, 7),
+    ("т19", "Троллейбус", "Без пересадок", 6 * 60 + 40, 8),
+    ("86", "Автобус", "1 пересадка", 7 * 60 + 5, 8),
+    ("м1", "Метро", "Без пересадок", 6 * 60, 5),
+];
+
+pub fn stop_names() -> &'static [&'static str] {
+    RU_STOP_NAMES
+}
+
+pub fn stop_arrivals(stop_index: usize) -> Vec<StopArrival> {
+    if stop_index >= RU_STOP_NAMES.len() {
+        return Vec::new();
+    }
+    // ponytail: per-stop offset keeps ETAs distinct without a full static timetable.
+    let now = frayed_core::now_local().minutes + stop_index as u32 * 3;
+    RU_ROUTES
+        .iter()
+        .map(|&(route, vehicle, badge, first, headway)| {
+            let since_first = now as i32 - first as i32;
+            let eta_min = if since_first < 0 {
+                (-since_first) as u32
+            } else {
+                let wait = headway - since_first as u32 % headway;
+                if wait == 0 {
+                    headway
+                } else {
+                    wait
+                }
+            };
+            StopArrival {
+                route: route.into(),
+                vehicle: vehicle.into(),
+                eta_min: eta_min.max(1),
+                badge: badge.into(),
+            }
+        })
+        .collect()
+}
+
+pub fn build_route(from: &str, to: &str) -> Vec<RouteLeg> {
+    vec![
+        RouteLeg {
+            vehicle: "Автобус".into(),
+            route: "12".into(),
+            from: from.into(),
+            to: "Абая".into(),
+            minutes: 12,
+        },
+        RouteLeg {
+            vehicle: "Метро".into(),
+            route: "м1".into(),
+            from: "Абая".into(),
+            to: to.into(),
+            minutes: 9,
+        },
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,6 +309,21 @@ mod tests {
         assert!(arrivals.iter().all(|a| a.minutes > 0 && a.minutes <= 24 * 60));
         assert_eq!(arrivals[0].stop_id, "kaznu");
         assert_eq!(TransitClient::new().arrivals().unwrap().len(), STOPS.len());
+    }
+
+    #[test]
+    fn russian_transport_helpers() {
+        assert_eq!(stop_names(), &["ВУЗ", "КазНУ", "Абая", "Алмалы"]);
+        let arrivals = stop_arrivals(0);
+        assert_eq!(arrivals.len(), RU_ROUTES.len());
+        assert!(arrivals.iter().all(|a| a.eta_min > 0));
+        assert!(arrivals.iter().any(|a| a.badge == "Без пересадок"));
+        assert!(arrivals.iter().any(|a| a.vehicle == "Метро"));
+        assert!(stop_arrivals(99).is_empty());
+        let legs = build_route("ВУЗ", "КазНУ");
+        assert_eq!(legs.len(), 2);
+        assert_eq!(legs[0].from, "ВУЗ");
+        assert_eq!(legs[1].to, "КазНУ");
     }
 }
 

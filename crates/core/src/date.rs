@@ -2,7 +2,7 @@
 
 use chrono::{Datelike, Local, Timelike};
 
-use crate::{ClassBlock, WEEKDAYS};
+use crate::{minutes_to_time, ClassBlock, WEEKDAYS};
 
 /// Local clock reading plus the calendar fields the UI needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +77,99 @@ pub fn next_class_start(blocks: &[ClassBlock], now_min: u32) -> Option<u32> {
     blocks.iter().map(|b| b.start_min).filter(|&m| m > now_min).min()
 }
 
+// ---------------------------------------------------------------------------
+// Display helpers
+// ---------------------------------------------------------------------------
+
+/// Short Russian weekday names, Monday first.
+pub const WEEKDAY_SHORT: [&str; WEEKDAYS] = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+/// Full Russian weekday names, Monday first.
+pub const WEEKDAY_FULL: [&str; WEEKDAYS] = [
+    "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье",
+];
+
+/// Space between every Unicode char so Slint can fake letter-spacing.
+pub fn spaced(s: &str) -> String {
+    s.chars().map(|c| c.to_string()).collect::<Vec<String>>().join(" ")
+}
+
+/// Genitive Russian month name (1..12), e.g. "ноября"; "" when out of range.
+pub fn genitive_month_ru(month: u32) -> &'static str {
+    const MONTHS: [&str; 12] = [
+        "января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября",
+        "октября", "ноября", "декабря",
+    ];
+    if (1..=12).contains(&month) {
+        MONTHS[(month - 1) as usize]
+    } else {
+        ""
+    }
+}
+
+/// e.g. "ПН · 21 ноября".
+pub fn date_label(weekday: usize, day: u32, month: u32) -> String {
+    let wd = WEEKDAY_SHORT.get(weekday).copied().unwrap_or("Пн").to_uppercase();
+    format!("{wd} · {day} {}", genitive_month_ru(month))
+}
+
+/// 4 = cancelled, 0 = past, 1 = current, 2 = soon (<=30 min), 3 = upcoming.
+pub fn lesson_state(start_min: u32, end_min: u32, now_min: u32, cancelled: bool) -> i32 {
+    if cancelled {
+        return 4;
+    }
+    if now_min >= end_min {
+        return 0;
+    }
+    if now_min >= start_min {
+        return 1;
+    }
+    if start_min - now_min <= 30 {
+        return 2;
+    }
+    3
+}
+
+/// Fraction of the current lesson elapsed, clamped to 0..1; 0 outside it.
+pub fn lesson_progress(start_min: u32, end_min: u32, now_min: u32) -> f32 {
+    if start_min >= end_min || now_min < start_min || now_min >= end_min {
+        return 0.0;
+    }
+    (now_min - start_min) as f32 / (end_min - start_min) as f32
+}
+
+/// One-line day summary, mirroring Freya's `_ContextLine`.
+pub fn context_line(blocks: &[ClassBlock], now_min: u32, cancelled: bool) -> String {
+    if cancelled {
+        return "День отменён — пары сегодня не состоятся".into();
+    }
+    if blocks.is_empty() {
+        return "Сегодня пар нет".into();
+    }
+    if let Some(current) = blocks.iter().find(|b| b.start_min <= now_min && now_min < b.end_min) {
+        return format!("Сейчас — {}", current.title);
+    }
+    let Some(start) = next_class_start(blocks, now_min) else {
+        return "Пары на сегодня закончились".into();
+    };
+    let title = blocks
+        .iter()
+        .find(|b| b.start_min == start)
+        .map_or("", |b| b.title.as_str());
+    let wait = start - now_min;
+    let countdown = if wait < 60 {
+        format!("{wait} мин")
+    } else {
+        let (hours, rest) = (wait / 60, wait % 60);
+        if rest == 0 {
+            format!("{hours} ч")
+        } else {
+            format!("{hours} ч {rest} мин")
+        }
+    };
+    format!("Следующая — {} · {title} · через {countdown}", minutes_to_time(start))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,6 +179,7 @@ mod tests {
         ClassBlock {
             title: "Class".into(),
             room: "A-1".into(),
+            teacher: String::new(),
             start_min,
             end_min: start_min + 90,
             kind: BlockKind::Lecture,
@@ -131,5 +225,48 @@ mod tests {
         assert!(now.minutes < 24 * 60);
         assert!((1..=12).contains(&now.month));
         assert_eq!(month_title_ru(4, 2026), "Апрель 2026");
+    }
+
+    #[test]
+    fn display_helpers() {
+        assert_eq!(WEEKDAY_SHORT[0], "Пн");
+        assert_eq!(WEEKDAY_FULL[6], "Воскресенье");
+        assert_eq!(spaced("РАСПИСАНИЕ"), "Р А С П И С А Н И Е");
+        assert_eq!(spaced("Йa"), "Й a");
+        assert_eq!(genitive_month_ru(11), "ноября");
+        assert_eq!(genitive_month_ru(0), "");
+        assert_eq!(date_label(0, 21, 11), "ПН · 21 ноября");
+    }
+
+    #[test]
+    fn lesson_state_and_progress() {
+        assert_eq!(lesson_state(600, 690, 700, false), 0);
+        assert_eq!(lesson_state(600, 690, 600, false), 1);
+        assert_eq!(lesson_state(600, 690, 689, false), 1);
+        assert_eq!(lesson_state(600, 690, 580, false), 2);
+        assert_eq!(lesson_state(600, 690, 569, false), 3);
+        assert_eq!(lesson_state(600, 690, 620, true), 4);
+        assert_eq!(lesson_progress(600, 690, 645), 0.5);
+        assert_eq!(lesson_progress(600, 690, 500), 0.0);
+        assert_eq!(lesson_progress(600, 690, 700), 0.0);
+    }
+
+    #[test]
+    fn context_line_copy() {
+        let blocks = [block(600), block(720)];
+        assert_eq!(context_line(&blocks, 620, false), "Сейчас — Class");
+        assert_eq!(
+            context_line(&blocks, 590, false),
+            "Следующая — 10:00 · Class · через 10 мин"
+        );
+        assert_eq!(
+            context_line(&blocks, 810, false),
+            "Пары на сегодня закончились"
+        );
+        assert_eq!(context_line(&[], 600, false), "Сегодня пар нет");
+        assert_eq!(
+            context_line(&blocks, 620, true),
+            "День отменён — пары сегодня не состоятся"
+        );
     }
 }
