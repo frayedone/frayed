@@ -5,10 +5,11 @@ slint::include_modules!();
 pub fn register_fonts() -> Result<(), String> {
     let regular: &[u8] = include_bytes!("../../../assets/fonts/Base-02-Cyrillic.ttf");
     let bold: &[u8] = include_bytes!("../../../assets/fonts/Base-02-Cyrillic-Bold.ttf");
+    let icons: &[u8] = include_bytes!("../../../assets/fonts/MaterialIcons-Regular.otf");
 
     let mut collection = slint::fontique_012::shared_collection();
     let mut fonts = Vec::new();
-    for bytes in [regular, bold] {
+    for bytes in [regular, bold, icons] {
         let blob = fontique::Blob::new(std::sync::Arc::new(bytes));
         fonts.extend(collection.register_fonts(blob, None).iter().map(|f| f.0.clone()));
     }

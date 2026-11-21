@@ -28,6 +28,19 @@ export struct BlockView {
 
 // --- small shared primitives ------------------------------------------------
 
+component Icon inherits Text {
+    in property <string> glyph;
+    in property <length> icon-size: 20px;
+    in property <color> tint: Tokens.muted;
+
+    text: root.glyph;
+    font-family: "Material Icons";
+    font-size: root.icon-size;
+    color: root.tint;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+}
+
 component IconButton inherits Rectangle {
     in property <string> glyph;
     in property <color> tint: Tokens.muted;
@@ -38,13 +51,11 @@ component IconButton inherits Rectangle {
     height: 34px;
     border-radius: 10px;
 
-    Text {
+    Icon {
         width: parent.width; height: parent.height;
-        text: root.glyph;
-        font-size: root.size;
-        color: root.tint;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+        glyph: root.glyph;
+        icon-size: root.size;
+        tint: root.tint;
     }
     TouchArea {
         width: parent.width; height: parent.height;
@@ -87,12 +98,13 @@ component SectionLabel inherits Rectangle {
     height: 34px;
     Rectangle { x: 20px; y: 9px; width: 3px; height: 16px; border-radius: 2px; background: Tokens.accent; }
     Text {
-        x: 33px; y: 0; width: parent.width - 40px; height: parent.height;
+        x: 33px; y: 0; width: parent.width - 48px; height: parent.height;
         text: root.label;
         font-family: "Base 02";
         font-size: 14px;
         color: Tokens.text;
         vertical-alignment: center;
+        overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
     }
 }
 
@@ -106,11 +118,12 @@ component FormField inherits Rectangle {
     border-radius: 12px;
 
     Text {
-        x: 12px; y: 0; height: parent.height;
+        x: 12px; y: 0; width: 92px; height: parent.height;
         text: root.label;
-        font-size: 12px;
+        font-size: 11.5px;
         color: Tokens.muted;
         vertical-alignment: center;
+        overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
     }
     TextInput {
         x: 104px; y: 0; width: parent.width - 116px; height: parent.height;
@@ -189,8 +202,8 @@ component LessonRow inherits Rectangle {
             background: Tokens.danger-soft;
             Text {
                 width: parent.width; height: parent.height;
-                text: "О Т М Е Н Ё Н";
-                font-size: 9.5px; font-weight: 800; color: Tokens.danger;
+                text: "Отменено";
+                font-size: 11px; font-weight: 800; color: Tokens.danger;
                 horizontal-alignment: center; vertical-alignment: center;
             }
         }
@@ -216,9 +229,9 @@ component LessonRow inherits Rectangle {
         if (root.live): Text {
             x: 14px;
             y: root.cancelled ? 98px : 72px;
-            width: parent.width - 58px; height: 13px;
-            text: root.block.state == 1 ? "И Д Ё Т  С Е Й Ч А С" : "С К О Р О";
-            font-size: 9.5px; font-weight: 800; color: Tokens.accent;
+            width: parent.width - 58px; height: 16px;
+            text: root.block.state == 1 ? "Идёт сейчас" : "Скоро";
+            font-size: 11px; font-weight: 800; color: Tokens.accent;
         }
 
         TouchArea {
@@ -228,7 +241,7 @@ component LessonRow inherits Rectangle {
 
         if (!root.cancelled): IconButton {
             x: parent.width - 44px; y: 11px;
-            glyph: root.block.reminded ? "🔔" : "🔕";
+            glyph: root.block.reminded ? "\u{e7f7}" : "\u{e7f5}";
             tint: root.block.reminded ? Tokens.accent : Tokens.muted;
             size: 19px;
             pressed => { root.remind(); }
@@ -359,15 +372,14 @@ export component MainWindow inherits Window {
         x: 0; y: 0; width: parent.width; height: root.banner-h;
         background: Tokens.accent-soft;
 
-        Text {
+        Icon {
             x: 18px; y: 0; width: 24px; height: parent.height;
-            text: "↑"; font-size: 19px; font-weight: 800; color: Tokens.accent;
-            vertical-alignment: center; horizontal-alignment: center;
+            glyph: "\u{e5d8}"; icon-size: 19px; tint: Tokens.accent;
         }
         Text {
             x: 46px; y: 0; width: parent.width - 190px; height: parent.height;
-            text: "О Б Н О В Л Е Н И Е  " + root.update-version;
-            font-family: "Base 02"; font-size: 14px; color: Tokens.text;
+            text: "Обновление " + root.update-version;
+            font-size: 12.5px; font-weight: 700; color: Tokens.text;
             vertical-alignment: center;
             overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
         }
@@ -396,20 +408,27 @@ export component MainWindow inherits Window {
         x: 0; y: root.body-y; width: parent.width; height: root.body-h;
 
         // app bar
-        Text {
-            x: 18px; y: 12px;
-            text: "Р А С П И С А Н И Е";
-            font-family: "Base 02"; font-size: 22px; color: Tokens.text;
-        }
-        IconButton {
-            x: 352px; y: 10px;
-            glyph: "⚙"; size: 20px;
-            pressed => { root.nav-pressed("settings"); }
-        }
-        IconButton {
-            x: 390px; y: 10px;
-            glyph: "+"; size: 22px;
-            pressed => { root.add-pressed(); }
+        HorizontalLayout {
+            x: 0; y: 6px; width: parent.width; height: 40px;
+            padding-left: 18px; padding-right: 10px; spacing: 4px;
+
+            Text {
+                horizontal-stretch: 1;
+                text: "Расписание";
+                font-family: "Base 02"; font-size: 22px; color: Tokens.text;
+                vertical-alignment: center;
+                overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+            }
+            IconButton {
+                horizontal-stretch: 0;
+                glyph: "\u{e8b8}"; size: 20px;
+                pressed => { root.nav-pressed("settings"); }
+            }
+            IconButton {
+                horizontal-stretch: 0;
+                glyph: "\u{e145}"; size: 22px;
+                pressed => { root.add-pressed(); }
+            }
         }
 
         // header (date / weekday / group)
@@ -417,20 +436,27 @@ export component MainWindow inherits Window {
             x: 0; y: 54px; width: parent.width; height: 114px;
             clicked => { root.today-pressed(); }
 
-            Text {
-                x: 18px; y: 6px; width: 280px; height: 18px;
-                text: root.date-label;
-                font-size: 11px; font-weight: 700; color: Tokens.muted;
-                vertical-alignment: center;
-            }
-            if (root.is-today): Rectangle {
-                x: parent.width - 110px; y: 4px; width: 92px; height: 22px;
-                border-radius: 999px;
-                background: Tokens.accent-soft;
+            HorizontalLayout {
+                x: 18px; y: 4px; width: parent.width - 36px; height: 24px;
+                spacing: 8px;
+
                 Text {
-                    width: parent.width; height: parent.height;
-                    text: "С Е Г О Д Н Я"; font-size: 10px; font-weight: 800; color: Tokens.accent;
-                    horizontal-alignment: center; vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    text: root.date-label;
+                    font-size: 12px; font-weight: 700; color: Tokens.muted;
+                    vertical-alignment: center;
+                    overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+                }
+                if (root.is-today): Rectangle {
+                    horizontal-stretch: 0;
+                    width: 84px; height: 22px;
+                    border-radius: 999px;
+                    background: Tokens.accent-soft;
+                    Text {
+                        width: parent.width; height: parent.height;
+                        text: "Сегодня"; font-size: 11.5px; font-weight: 800; color: Tokens.accent;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
                 }
             }
             Text {
@@ -441,15 +467,16 @@ export component MainWindow inherits Window {
                 overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
             }
             Rectangle {
-                x: 18px; y: 80px; width: 132px; height: 28px;
+                x: 18px; y: 80px; width: 180px; height: 28px;
                 border-radius: 999px;
                 background: Tokens.card;
                 border-width: 1px; border-color: Tokens.border;
                 Text {
                     x: 10px; width: parent.width - 20px; height: parent.height;
                     text: "Группа " + root.group-name;
-                    font-size: 12px; font-weight: 700; color: Tokens.accent;
+                    font-size: 12px; font-weight: 700; color: Tokens.text;
                     vertical-alignment: center;
+                    overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
                 }
             }
         }
@@ -458,46 +485,51 @@ export component MainWindow inherits Window {
         Rectangle {
             x: 0; y: 168px; width: parent.width; height: 56px;
 
-            for day[i] in root.day-labels: day-cell := TouchArea {
-                x: i * parent.width / 7; y: 0; width: parent.width / 7; height: parent.height;
-                property <int> st: i < root.day-states.length ? root.day-states[i] : 0;
-                property <bool> sel: st == 1 || st == 3 || st == 5 || st == 7;
-                property <bool> has: st == 2 || st == 3 || st == 6 || st == 7;
-                property <bool> can: st == 4 || st == 5 || st == 6 || st == 7;
-                property <color> day-accent: day-cell.can ? Tokens.danger : Tokens.accent;
+            HorizontalLayout {
+                x: 0; y: 0; width: parent.width; height: parent.height;
 
-                clicked => { root.day-selected(i); }
+                for day[i] in root.day-labels: day-cell := TouchArea {
+                    horizontal-stretch: 1;
+                    property <int> st: i < root.day-states.length ? root.day-states[i] : 0;
+                    property <bool> sel: st == 1 || st == 3 || st == 5 || st == 7;
+                    property <bool> has: st == 2 || st == 3 || st == 6 || st == 7;
+                    property <bool> can: st == 4 || st == 5 || st == 6 || st == 7;
+                    property <color> day-accent: day-cell.can ? Tokens.danger : Tokens.accent;
 
-                Rectangle {
-                    x: 2px; y: 6px; width: parent.width - 4px; height: parent.height - 12px;
-                    border-radius: 12px;
-                    background: day-cell.sel ? rgba(226, 162, 59, 0.12) : transparent;
-                }
-                Text {
-                    x: 0; y: 8px; width: parent.width; height: 15px;
-                    text: day;
-                    font-size: 10.5px; font-weight: 700;
-                    color: day-cell.sel ? day-cell.day-accent : Tokens.muted;
-                    horizontal-alignment: center;
-                }
-                Text {
-                    x: 0; y: 23px; width: parent.width; height: 20px;
-                    text: i < root.day-numbers.length ? root.day-numbers[i] : "";
-                    font-size: 16px; font-weight: 800;
-                    color: day-cell.sel ? day-cell.day-accent : Tokens.text;
-                    horizontal-alignment: center;
-                }
-                Rectangle {
-                    x: parent.width / 2 - (day-cell.sel ? 9px : (day-cell.has ? 2px : 0px));
-                    y: 45px;
-                    width: day-cell.sel ? 18px : (day-cell.has ? 4px : 0px);
-                    height: 4px;
-                    border-radius: 999px;
-                    background: day-cell.can ? Tokens.danger : (day-cell.sel ? Tokens.accent : (day-cell.has ? Tokens.border : transparent));
-                }
-                if (i < 6): Rectangle {
-                    x: parent.width - 0.5px; y: 16px; width: 1px; height: 24px;
-                    background: Tokens.border;
+                    clicked => { root.day-selected(i); }
+
+                    Rectangle {
+                        x: 2px; y: 6px; width: parent.width - 4px; height: parent.height - 12px;
+                        border-radius: 12px;
+                        background: day-cell.sel ? rgba(226, 162, 59, 0.12) : transparent;
+                    }
+                    Text {
+                        x: 0; y: 8px; width: parent.width; height: 16px;
+                        text: day;
+                        font-size: 11.5px; font-weight: 700;
+                        color: day-cell.sel ? day-cell.day-accent : Tokens.text;
+                        horizontal-alignment: center;
+                        overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+                    }
+                    Text {
+                        x: 0; y: 24px; width: parent.width; height: 20px;
+                        text: i < root.day-numbers.length ? root.day-numbers[i] : "";
+                        font-size: 16px; font-weight: 800;
+                        color: day-cell.sel ? day-cell.day-accent : Tokens.text;
+                        horizontal-alignment: center;
+                    }
+                    Rectangle {
+                        x: parent.width / 2 - (day-cell.sel ? 9px : (day-cell.has ? 2px : 0px));
+                        y: 46px;
+                        width: day-cell.sel ? 18px : (day-cell.has ? 4px : 0px);
+                        height: 4px;
+                        border-radius: 999px;
+                        background: day-cell.can ? Tokens.danger : (day-cell.sel ? Tokens.accent : (day-cell.has ? Tokens.border : transparent));
+                    }
+                    if (i < 6): Rectangle {
+                        x: parent.width - 0.5px; y: 16px; width: 1px; height: 24px;
+                        background: Tokens.border;
+                    }
                 }
             }
             Rectangle {
@@ -512,16 +544,16 @@ export component MainWindow inherits Window {
             border-radius: 6px;
             background: Tokens.danger-soft;
             border-width: 1px; border-color: rgba(255, 92, 77, 0.35);
-            Text {
+            Icon {
                 x: 12px; y: 0; width: 20px; height: parent.height;
-                text: "▣"; font-size: 16px; color: Tokens.danger; vertical-alignment: center;
+                glyph: "\u{e615}"; icon-size: 17px; tint: Tokens.danger;
             }
             Text {
-                x: 38px; y: 0; width: parent.width - 150px; height: parent.height;
+                x: 38px; y: 4px; width: parent.width - 140px; height: parent.height - 8px;
                 text: "День отменён — пары сегодня не состоятся";
                 font-size: 12.5px; font-weight: 600; color: Tokens.danger;
                 vertical-alignment: center;
-                overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+                wrap: TextWrap.word-wrap;
             }
             TouchArea {
                 x: parent.width - 100px; y: 0; width: 92px; height: parent.height;
@@ -536,21 +568,21 @@ export component MainWindow inherits Window {
 
         // inline context line
         if (!root.day-cancelled && root.context-line != ""): Rectangle {
-            x: 18px; y: 232px; width: parent.width - 36px; height: 20px;
+            x: 18px; y: 232px; width: parent.width - 36px; height: 28px;
             Rectangle {
-                x: 5px; y: 7px; width: 6px; height: 6px;
+                x: 5px; y: 11px; width: 6px; height: 6px;
                 border-radius: 3px; background: Tokens.accent;
             }
             Text {
                 x: 19px; y: 0; width: parent.width - 19px; height: parent.height;
                 text: root.context-line;
-                font-size: 12.5px; font-weight: 600; color: Tokens.muted;
+                font-size: 12.5px; font-weight: 600; color: Tokens.text;
                 vertical-alignment: center;
-                overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+                wrap: TextWrap.word-wrap;
             }
         }
         if (!root.day-cancelled): TouchArea {
-            x: parent.width - 130px; y: 252px; width: 112px; height: 24px;
+            x: parent.width - 130px; y: 264px; width: 112px; height: 24px;
             clicked => { root.cancel-day-pressed(); }
             Text {
                 width: parent.width; height: parent.height;
@@ -566,20 +598,19 @@ export component MainWindow inherits Window {
             background: Tokens.card;
             border-width: 1px;
             border-color: root.weather-rainy ? rgba(226, 162, 59, 0.55) : Tokens.border;
-            Text {
+            Icon {
                 x: 10px; y: 0; width: 18px; height: parent.height;
-                text: root.weather-rainy ? "☂" : "◍";
-                font-size: 15px;
-                color: root.weather-rainy ? Tokens.accent : Tokens.muted;
-                vertical-alignment: center;
+                glyph: root.weather-rainy ? "\u{e2bd}" : "\u{e1ff}";
+                icon-size: 17px;
+                tint: root.weather-rainy ? Tokens.accent : Tokens.muted;
             }
             Text {
-                x: 32px; y: 0; width: parent.width - 44px; height: parent.height;
+                x: 34px; y: 4px; width: parent.width - 46px; height: parent.height - 8px;
                 text: root.weather-hint;
                 font-size: 12px; font-weight: 600;
-                color: root.weather-rainy ? Tokens.accent : Tokens.muted;
+                color: root.weather-rainy ? Tokens.accent : Tokens.text;
                 vertical-alignment: center;
-                overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+                wrap: TextWrap.word-wrap;
             }
         }
 
@@ -591,10 +622,9 @@ export component MainWindow inherits Window {
                 border-radius: 36px;
                 background: Tokens.card;
                 border-width: 1px; border-color: Tokens.border;
-                Text {
+                Icon {
                     width: parent.width; height: parent.height;
-                    text: "☾"; font-size: 30px; color: Tokens.accent;
-                    horizontal-alignment: center; vertical-alignment: center;
+                    glyph: "\u{ef5e}"; icon-size: 30px; tint: Tokens.accent;
                 }
             }
             Text {
@@ -631,15 +661,22 @@ export component MainWindow inherits Window {
     if (root.screen == "weather"): Rectangle {
         x: 0; y: root.body-y; width: parent.width; height: root.body-h;
 
-        Text {
-            x: 18px; y: 12px;
-            text: "П О Г О Д А";
-            font-family: "Base 02"; font-size: 22px; color: Tokens.text;
-        }
-        IconButton {
-            x: 390px; y: 10px;
-            glyph: "↻"; size: 24px;
-            pressed => { root.refresh-pressed(); }
+        HorizontalLayout {
+            x: 0; y: 6px; width: parent.width; height: 40px;
+            padding-left: 18px; padding-right: 10px; spacing: 4px;
+
+            Text {
+                horizontal-stretch: 1;
+                text: "Погода";
+                font-family: "Base 02"; font-size: 22px; color: Tokens.text;
+                vertical-alignment: center;
+                overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+            }
+            IconButton {
+                horizontal-stretch: 0;
+                glyph: "\u{e5d5}"; size: 24px;
+                pressed => { root.refresh-pressed(); }
+            }
         }
 
         Flickable {
@@ -652,11 +689,9 @@ export component MainWindow inherits Window {
                 border-radius: 28px;
                 background: @linear-gradient(135deg, root.hero-top 0%, root.hero-mid 50%, root.hero-bottom 100%);
 
-                Text {
+                Icon {
                     x: 0; y: 26px; width: parent.width; height: 76px;
-                    text: "☀";
-                    font-size: 64px; color: #FFFFFFFF;
-                    horizontal-alignment: center; vertical-alignment: center;
+                    glyph: "\u{e1ff}"; icon-size: 64px; tint: #FFFFFFFF;
                 }
                 Text {
                     x: 0; y: 106px; width: parent.width; height: 80px;
@@ -666,13 +701,13 @@ export component MainWindow inherits Window {
                     wrap: TextWrap.no-wrap;
                 }
                 Text {
-                    x: 0; y: 150px; width: parent.width; height: 24px;
+                    x: 0; y: 174px; width: parent.width; height: 24px;
                     text: root.weather-condition;
                     font-size: 16px; color: #B3FFFFFF;
                     horizontal-alignment: center; vertical-alignment: center;
                 }
                 Rectangle {
-                    x: parent.width / 2 - 120px; y: 186px; width: 240px; height: 30px;
+                    x: parent.width / 2 - 120px; y: 200px; width: 240px; height: 30px;
                     border-radius: 999px;
                     background: rgba(255, 255, 255, 0.15);
                     Text {
@@ -685,17 +720,22 @@ export component MainWindow inherits Window {
                 }
             }
 
-            Text {
-                x: 20px; y: 252px; width: 200px; height: 26px;
-                text: "На неделю";
-                font-size: 16px; font-weight: 700; color: Tokens.text;
-                vertical-alignment: center;
-            }
-            Text {
-                x: parent.width - 110px; y: 252px; width: 90px; height: 26px;
-                text: "Алматы";
-                font-size: 12px; color: Tokens.muted;
-                horizontal-alignment: right; vertical-alignment: center;
+            HorizontalLayout {
+                x: 20px; y: 252px; width: parent.width - 40px; height: 26px;
+                spacing: 8px;
+
+                Text {
+                    horizontal-stretch: 1;
+                    text: "На неделю";
+                    font-size: 16px; font-weight: 700; color: Tokens.text;
+                    vertical-alignment: center;
+                }
+                Text {
+                    horizontal-stretch: 0;
+                    text: "Алматы";
+                    font-size: 12px; color: Tokens.muted;
+                    horizontal-alignment: right; vertical-alignment: center;
+                }
             }
 
             for f[i] in root.forecast: Rectangle {
@@ -719,10 +759,17 @@ export component MainWindow inherits Window {
     if (root.screen == "transport"): Rectangle {
         x: 0; y: root.body-y; width: parent.width; height: root.body-h;
 
-        Text {
-            x: 18px; y: 12px;
-            text: "Т Р А Н С П О Р Т";
-            font-family: "Base 02"; font-size: 22px; color: Tokens.text;
+        HorizontalLayout {
+            x: 0; y: 6px; width: parent.width; height: 40px;
+            padding-left: 18px; padding-right: 10px;
+
+            Text {
+                horizontal-stretch: 1;
+                text: "Транспорт";
+                font-family: "Base 02"; font-size: 22px; color: Tokens.text;
+                vertical-alignment: center;
+                overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+            }
         }
 
         // segmented control
@@ -732,34 +779,39 @@ export component MainWindow inherits Window {
             background: Tokens.card;
             border-width: 1px; border-color: Tokens.border;
 
-            Rectangle {
-                x: 3px; y: 3px; width: parent.width / 2 - 3px; height: parent.height - 6px;
-                border-radius: 11px;
-                background: root.transport-mode == 0 ? Tokens.accent-soft : transparent;
-                Text {
-                    width: parent.width; height: parent.height;
-                    text: "Остановка"; font-size: 13px; font-weight: 700;
-                    color: root.transport-mode == 0 ? Tokens.accent : Tokens.muted;
-                    horizontal-alignment: center; vertical-alignment: center;
+            HorizontalLayout {
+                x: 3px; y: 3px; width: parent.width - 6px; height: parent.height - 6px;
+                spacing: 0px;
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 11px;
+                    background: root.transport-mode == 0 ? Tokens.accent-soft : transparent;
+                    Text {
+                        width: parent.width; height: parent.height;
+                        text: "Остановка"; font-size: 13px; font-weight: 700;
+                        color: root.transport-mode == 0 ? Tokens.accent : Tokens.text;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
+                    TouchArea {
+                        width: parent.width; height: parent.height;
+                        clicked => { root.transport-mode-changed(0); }
+                    }
                 }
-                TouchArea {
-                    width: parent.width; height: parent.height;
-                    clicked => { root.transport-mode-changed(0); }
-                }
-            }
-            Rectangle {
-                x: parent.width / 2; y: 3px; width: parent.width / 2 - 3px; height: parent.height - 6px;
-                border-radius: 11px;
-                background: root.transport-mode == 1 ? Tokens.accent-soft : transparent;
-                Text {
-                    width: parent.width; height: parent.height;
-                    text: "Маршрут"; font-size: 13px; font-weight: 700;
-                    color: root.transport-mode == 1 ? Tokens.accent : Tokens.muted;
-                    horizontal-alignment: center; vertical-alignment: center;
-                }
-                TouchArea {
-                    width: parent.width; height: parent.height;
-                    clicked => { root.transport-mode-changed(1); }
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 11px;
+                    background: root.transport-mode == 1 ? Tokens.accent-soft : transparent;
+                    Text {
+                        width: parent.width; height: parent.height;
+                        text: "Маршрут"; font-size: 13px; font-weight: 700;
+                        color: root.transport-mode == 1 ? Tokens.accent : Tokens.text;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
+                    TouchArea {
+                        width: parent.width; height: parent.height;
+                        clicked => { root.transport-mode-changed(1); }
+                    }
                 }
             }
         }
@@ -804,18 +856,17 @@ export component MainWindow inherits Window {
                         x: 10px; y: 11px; width: 44px; height: 40px;
                         border-radius: 10px;
                         background: Tokens.card-raised;
-                        Text {
+                        Icon {
                             width: parent.width; height: parent.height;
-                            text: "🚌"; font-size: 18px;
-                            horizontal-alignment: center; vertical-alignment: center;
+                            glyph: "\u{e530}"; icon-size: 20px; tint: Tokens.accent;
                         }
                     }
                     Text {
-                        x: 66px; y: 0; width: parent.width - 80px; height: parent.height;
+                        x: 66px; y: 8px; width: parent.width - 80px; height: parent.height - 16px;
                         text: a;
-                        font-size: 14.5px; font-weight: 800; color: Tokens.text;
+                        font-size: 13.5px; font-weight: 800; color: Tokens.text;
                         vertical-alignment: center;
-                        overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+                        wrap: TextWrap.word-wrap;
                     }
                 }
             }
@@ -834,17 +885,16 @@ export component MainWindow inherits Window {
                 Text { x: 18px; y: 8px; width: parent.width - 36px; height: 20px; text: "Откуда"; font-size: 11px; color: Tokens.muted; }
                 FormField {
                     x: 44px; y: 28px; width: parent.width - 60px; height: 40px;
-                    label: "Начальная остановка";
+                    label: "Начальная";
                     text <=> root.form-from;
                 }
                 Rectangle {
                     x: 54px; y: 70px; width: 2px; height: 16px;
                     background: Tokens.border;
                 }
-                Text {
-                    x: parent.width - 60px; y: 72px; width: 30px; height: 20px;
-                    text: "⇅"; font-size: 21px; color: Tokens.muted;
-                    horizontal-alignment: center;
+                Icon {
+                    x: parent.width - 62px; y: 70px; width: 32px; height: 24px;
+                    glyph: "\u{e8d5}"; icon-size: 21px; tint: Tokens.muted;
                 }
                 TouchArea {
                     x: parent.width - 66px; y: 68px; width: 42px; height: 28px;
@@ -857,7 +907,7 @@ export component MainWindow inherits Window {
                 Text { x: 18px; y: 90px; width: parent.width - 110px; height: 20px; text: "Куда"; font-size: 11px; color: Tokens.muted; }
                 FormField {
                     x: 44px; y: 108px; width: parent.width - 60px; height: 40px;
-                    label: "Конечная остановка";
+                    label: "Конечная";
                     text <=> root.form-to;
                 }
             }
@@ -881,10 +931,9 @@ export component MainWindow inherits Window {
                         x: 14px; y: 14px; width: 26px; height: 26px;
                         border-radius: 8px;
                         background: Tokens.accent-soft;
-                        Text {
+                        Icon {
                             width: parent.width; height: parent.height;
-                            text: "▸"; font-size: 14px; font-weight: 800; color: Tokens.accent;
-                            horizontal-alignment: center; vertical-alignment: center;
+                            glyph: "\u{e5cc}"; icon-size: 18px; tint: Tokens.accent;
                         }
                     }
                     Rectangle {
@@ -907,22 +956,29 @@ export component MainWindow inherits Window {
     if (root.screen == "settings"): Rectangle {
         x: 0; y: root.body-y; width: parent.width; height: root.body-h;
 
-        Text {
-            x: 54px; y: 12px;
-            text: "Н А С Т Р О Й К И";
-            font-family: "Base 02"; font-size: 20px; color: Tokens.text;
-        }
-        IconButton {
-            x: 10px; y: 10px;
-            glyph: "←"; size: 22px;
-            pressed => { root.nav-pressed("schedule"); }
+        HorizontalLayout {
+            x: 0; y: 6px; width: parent.width; height: 40px;
+            padding-left: 10px; padding-right: 18px; spacing: 8px;
+
+            IconButton {
+                horizontal-stretch: 0;
+                glyph: "\u{e5c4}"; size: 22px;
+                pressed => { root.nav-pressed("schedule"); }
+            }
+            Text {
+                horizontal-stretch: 1;
+                text: "Настройки";
+                font-family: "Base 02"; font-size: 20px; color: Tokens.text;
+                vertical-alignment: center;
+                overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+            }
         }
 
         Flickable {
             x: 0; y: 58px; width: parent.width; height: root.body-h - 58px;
             content-height: 640px;
 
-            SectionLabel { x: 0; y: 6px; width: parent.width; label: "У В Е Д О М Л Е Н И Я"; }
+            SectionLabel { x: 0; y: 6px; width: parent.width; label: "Уведомления"; }
             Rectangle {
                 x: 18px; y: 44px; width: parent.width - 36px; height: 150px;
                 border-radius: 14px;
@@ -937,7 +993,7 @@ export component MainWindow inherits Window {
                 }
             }
 
-            SectionLabel { x: 0; y: 208px; width: parent.width; label: "О Ф О Р М Л Е Н И Е"; }
+            SectionLabel { x: 0; y: 208px; width: parent.width; label: "Оформление"; }
             Text {
                 x: 20px; y: 246px; width: parent.width - 40px; height: 40px;
                 text: "Тёмная тема · янтарь · Freya";
@@ -945,14 +1001,14 @@ export component MainWindow inherits Window {
                 wrap: TextWrap.word-wrap;
             }
 
-            SectionLabel { x: 0; y: 292px; width: parent.width; label: "П Р Е С Е Т Ы"; }
+            SectionLabel { x: 0; y: 292px; width: parent.width; label: "Пресеты"; }
             PillButton {
                 x: 18px; y: 330px; width: parent.width - 36px; height: 46px;
                 label: "Пресеты расписания";
                 pressed => { root.nav-pressed("presets"); }
             }
 
-            SectionLabel { x: 0; y: 392px; width: parent.width; label: "П Р И Л О Ж Е Н И Е"; }
+            SectionLabel { x: 0; y: 392px; width: parent.width; label: "Приложение"; }
             PillButton {
                 x: 18px; y: 430px; width: parent.width - 36px; height: 46px;
                 label: "Обновить данные";
@@ -976,20 +1032,25 @@ export component MainWindow inherits Window {
     if (root.screen == "presets"): Rectangle {
         x: 0; y: root.body-y; width: parent.width; height: root.body-h;
 
-        IconButton {
-            x: 10px; y: 10px;
-            glyph: "←"; size: 22px;
-            pressed => { root.nav-pressed("settings"); }
+        HorizontalLayout {
+            x: 0; y: 6px; width: parent.width; height: 40px;
+            padding-left: 10px; padding-right: 18px; spacing: 8px;
+
+            IconButton {
+                horizontal-stretch: 0;
+                glyph: "\u{e5c4}"; size: 22px;
+                pressed => { root.nav-pressed("settings"); }
+            }
+            Text {
+                horizontal-stretch: 1;
+                text: "Пресеты расписания";
+                font-family: "Base 02"; font-size: 16px; color: Tokens.text;
+                vertical-alignment: center;
+                overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+            }
         }
         Text {
-            x: 52px; y: 13px; width: parent.width - 70px; height: 30px;
-            text: "П Р Е С Е Т Ы  Р А С П И С А Н И Я";
-            font-family: "Base 02"; font-size: 15px; color: Tokens.text;
-            vertical-alignment: center;
-            overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
-        }
-        Text {
-            x: 18px; y: 56px; width: parent.width - 36px; height: 40px;
+            x: 18px; y: 56px; width: parent.width - 36px; height: 48px;
             text: "Пресет — сохранённый набор пар. Переключайся между группами или вариантами недели одним касанием.";
             font-size: 12.5px; color: Tokens.muted;
             wrap: TextWrap.word-wrap;
@@ -1004,10 +1065,9 @@ export component MainWindow inherits Window {
                 x: 12px; y: 11px; width: 36px; height: 36px;
                 border-radius: 10px;
                 background: Tokens.card-raised;
-                Text {
+                Icon {
                     width: parent.width; height: parent.height;
-                    text: "▤"; font-size: 18px; color: Tokens.accent;
-                    horizontal-alignment: center; vertical-alignment: center;
+                    glyph: "\u{ebcc}"; icon-size: 19px; tint: Tokens.accent;
                 }
             }
             Text {
@@ -1027,15 +1087,22 @@ export component MainWindow inherits Window {
     if (root.screen == "edit"): Rectangle {
         x: 0; y: root.body-y; width: parent.width; height: root.body-h;
 
-        Text {
-            x: 18px; y: 14px;
-            text: root.edit-title != "" ? "И З М Е Н И Т Ь  П А Р У" : "Н О В А Я  П А Р А";
-            font-family: "Base 02"; font-size: 20px; color: Tokens.text;
-        }
-        IconButton {
-            x: 390px; y: 10px;
-            glyph: "×"; size: 24px;
-            pressed => { root.edit-close(); }
+        HorizontalLayout {
+            x: 0; y: 6px; width: parent.width; height: 40px;
+            padding-left: 18px; padding-right: 10px; spacing: 4px;
+
+            Text {
+                horizontal-stretch: 1;
+                text: root.edit-title != "" ? "Изменить пару" : "Новая пара";
+                font-family: "Base 02"; font-size: 20px; color: Tokens.text;
+                vertical-alignment: center;
+                overflow: TextOverflow.elide; wrap: TextWrap.no-wrap;
+            }
+            IconButton {
+                horizontal-stretch: 0;
+                glyph: "\u{e5cd}"; size: 24px;
+                pressed => { root.edit-close(); }
+            }
         }
 
         FormField {
@@ -1071,7 +1138,7 @@ export component MainWindow inherits Window {
         Text {
             x: 20px; y: 326px; width: parent.width - 40px; height: 18px;
             text: "Тип занятия";
-            font-size: 11px; color: Tokens.muted;
+            font-size: 11.5px; color: Tokens.text;
         }
 
         PillButton { x: 18px; y: 352px; width: 76px; height: 38px; label: "Лекция"; active: root.form-kind == 0; pressed => { root.form-kind = 0; } }
@@ -1101,72 +1168,73 @@ export component MainWindow inherits Window {
         background: Tokens.bg;
         Rectangle { x: 0; y: 0; width: parent.width; height: 1px; background: Tokens.border; }
 
-        // Schedule
-        TouchArea {
-            x: 0; y: 1px; width: parent.width / 3; height: 67px;
-            clicked => { root.nav-pressed("schedule"); }
-            if (root.sched-active): Rectangle {
-                x: parent.width / 2 - 40px; y: 5px; width: 80px; height: 50px;
-                border-radius: 14px;
-                background: rgba(226, 162, 59, 0.18);
-            }
-            Text {
-                x: 0; y: 12px; width: parent.width; height: 26px;
-                text: "▦"; font-size: 24px;
-                color: root.sched-active ? Tokens.accent : Tokens.muted;
-                horizontal-alignment: center; vertical-alignment: center;
-            }
-            Text {
-                x: 0; y: 40px; width: parent.width; height: 16px;
-                text: "Расписание"; font-size: 11px; font-weight: 700;
-                color: root.sched-active ? Tokens.accent : Tokens.muted;
-                horizontal-alignment: center; vertical-alignment: center;
-            }
-        }
+        HorizontalLayout {
+            x: 0; y: 1px; width: parent.width; height: 67px;
 
-        // Weather
-        TouchArea {
-            x: parent.width / 3; y: 1px; width: parent.width / 3; height: 67px;
-            clicked => { root.nav-pressed("weather"); }
-            if (root.screen == "weather"): Rectangle {
-                x: parent.width / 2 - 40px; y: 5px; width: 80px; height: 50px;
-                border-radius: 14px;
-                background: rgba(226, 162, 59, 0.18);
+            // Schedule
+            TouchArea {
+                horizontal-stretch: 1;
+                clicked => { root.nav-pressed("schedule"); }
+                if (root.sched-active): Rectangle {
+                    x: parent.width / 2 - 40px; y: 5px; width: 80px; height: 50px;
+                    border-radius: 14px;
+                    background: rgba(226, 162, 59, 0.18);
+                }
+                Icon {
+                    x: 0; y: 11px; width: parent.width; height: 26px;
+                    glyph: "\u{ebcc}"; icon-size: 24px;
+                    tint: root.sched-active ? Tokens.accent : Tokens.muted;
+                }
+                Text {
+                    x: 0; y: 39px; width: parent.width; height: 18px;
+                    text: "Расписание"; font-size: 11.5px; font-weight: 700;
+                    color: root.sched-active ? Tokens.accent : Tokens.muted;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
             }
-            Text {
-                x: 0; y: 12px; width: parent.width; height: 26px;
-                text: "☀"; font-size: 24px;
-                color: root.screen == "weather" ? Tokens.accent : Tokens.muted;
-                horizontal-alignment: center; vertical-alignment: center;
-            }
-            Text {
-                x: 0; y: 40px; width: parent.width; height: 16px;
-                text: "Погода"; font-size: 11px; font-weight: 700;
-                color: root.screen == "weather" ? Tokens.accent : Tokens.muted;
-                horizontal-alignment: center; vertical-alignment: center;
-            }
-        }
 
-        // Transport
-        TouchArea {
-            x: parent.width * 2 / 3; y: 1px; width: parent.width / 3; height: 67px;
-            clicked => { root.nav-pressed("transport"); }
-            if (root.screen == "transport"): Rectangle {
-                x: parent.width / 2 - 40px; y: 5px; width: 80px; height: 50px;
-                border-radius: 14px;
-                background: rgba(226, 162, 59, 0.18);
+            // Weather
+            TouchArea {
+                horizontal-stretch: 1;
+                clicked => { root.nav-pressed("weather"); }
+                if (root.screen == "weather"): Rectangle {
+                    x: parent.width / 2 - 40px; y: 5px; width: 80px; height: 50px;
+                    border-radius: 14px;
+                    background: rgba(226, 162, 59, 0.18);
+                }
+                Icon {
+                    x: 0; y: 11px; width: parent.width; height: 26px;
+                    glyph: "\u{e1ff}"; icon-size: 24px;
+                    tint: root.screen == "weather" ? Tokens.accent : Tokens.muted;
+                }
+                Text {
+                    x: 0; y: 39px; width: parent.width; height: 18px;
+                    text: "Погода"; font-size: 11.5px; font-weight: 700;
+                    color: root.screen == "weather" ? Tokens.accent : Tokens.muted;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
             }
-            Text {
-                x: 0; y: 12px; width: parent.width; height: 26px;
-                text: "🚌"; font-size: 22px;
-                color: root.screen == "transport" ? Tokens.accent : Tokens.muted;
-                horizontal-alignment: center; vertical-alignment: center;
-            }
-            Text {
-                x: 0; y: 40px; width: parent.width; height: 16px;
-                text: "Транспорт"; font-size: 11px; font-weight: 700;
-                color: root.screen == "transport" ? Tokens.accent : Tokens.muted;
-                horizontal-alignment: center; vertical-alignment: center;
+
+            // Transport
+            TouchArea {
+                horizontal-stretch: 1;
+                clicked => { root.nav-pressed("transport"); }
+                if (root.screen == "transport"): Rectangle {
+                    x: parent.width / 2 - 40px; y: 5px; width: 80px; height: 50px;
+                    border-radius: 14px;
+                    background: rgba(226, 162, 59, 0.18);
+                }
+                Icon {
+                    x: 0; y: 11px; width: parent.width; height: 26px;
+                    glyph: "\u{e530}"; icon-size: 22px;
+                    tint: root.screen == "transport" ? Tokens.accent : Tokens.muted;
+                }
+                Text {
+                    x: 0; y: 39px; width: parent.width; height: 18px;
+                    text: "Транспорт"; font-size: 11.5px; font-weight: 700;
+                    color: root.screen == "transport" ? Tokens.accent : Tokens.muted;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
             }
         }
     }
